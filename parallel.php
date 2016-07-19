@@ -19,27 +19,26 @@ if (file_exists($config->lockfile)) {
     throw new \RuntimeException("$config->lockfile exists");
 }
 
-
-touch($config->lockfile);
+touch($config->lockfile);   // 创建锁文件 尝试将由给出的文件的访问和修改时间设定为给出的时间，注意访问时间总是会被修改的，不论有几个参数。如果文件不存在，则会被创建。
 register_shutdown_function(function() use($config) {
-    unlink($config->lockfile);
+    unlink($config->lockfile);  // 代码执行完删除锁文件
 });
 
-$globals = new \stdClass;
-$globals->q = new \SplQueue;
+$globals = new \stdClass;   // 可理解为新数组
+$globals->q = new \SplQueue;// stdClass属性，队列
 $globals->expiredManager = new ExpiredFileManager($config->expiredDb, $config->expireMinutes);
 for ($i=0; $i<$config->maxConnections; ++$i) {
     $req = new Request;
-    $req->setOption('encoding', 'gzip');
-    $req->setOption('userAgent', 'https://github.com/hirak/packagist-crawler');
-    $globals->q->enqueue($req);
+    $req->setOption('encoding', 'gzip');    // CURLOPT_ENCODING	HTTP请求头中"Accept-Encoding: "的值。 这使得能够解码响应的内容。 支持的编码有"identity"，"deflate"和"gzip"。如果为空字符串""，会发送所有支持的编码类型。	在 cURL 7.10 中被加入。
+    $req->setOption('userAgent', 'https://github.com/hirak/packagist-crawler'); // CURLOPT_USERAGENT	在HTTP请求中包含一个"User-Agent: "头的字符串。
+    $globals->q->enqueue($req); // 加入队列
 }
 
-$globals->mh = new Multi;
-clearExpiredFiles($globals->expiredManager);
+$globals->mh = new Multi;   // stdClass属性，用于多线程
+clearExpiredFiles($globals->expiredManager);    // 清除过期文件
 
 do {
-    $globals->retry = false;
+    $globals->retry = false;// stdClass属性，用于终止循环
     $providers = downloadProviders($config, $globals);
     downloadPackages($config, $globals, $providers);
     $globals->retry = checkFiles($config);
@@ -54,16 +53,16 @@ exit;
  */
 function downloadProviders($config, $globals)
 {
-    $cachedir = $config->cachedir;
+    $cachedir = $config->cachedir;  // 缓存目录
 
-    $packagesCache = $cachedir . 'packages.json';
+    $packagesCache = $cachedir . 'packages.json';   // 缓存文件名
 
-    $req = new Request($config->packagistUrl . '/packages.json');
-    $req->setOption('encoding', 'gzip');
+    $req = new Request($config->packagistUrl . '/packages.json');   // 请求
+    $req->setOption('encoding', 'gzip');    // CURLOPT_ENCODING	HTTP请求头中"Accept-Encoding: "的值。
 
-    $res = $req->send();
+    $res = $req->send();    // 发送请求
 
-    if (200 === $res->getStatusCode()) {
+    if (200 === $res->getStatusCode()) {    // 请求成功
         $packages = json_decode($res->getBody());
         foreach (explode(' ', 'notify notify-batch search') as $k) {
             if (0 === strpos($packages->$k, '/')) {
@@ -83,7 +82,7 @@ function downloadProviders($config, $globals)
 
     $providers = [];
 
-    $numberOfProviders = count( (array)$packages->{'provider-includes'} );
+    $numberOfProviders = count( (array)$packages->{'provider-includes'} );  // key值里有短横线-，要这样写：{'provider-includes'}
     $progressBar = new ProgressBarManager(0, $numberOfProviders);
     $progressBar->setFormat('Downloading Providers: %current%/%max% [%bar%] %percent%%');
 
@@ -98,12 +97,12 @@ function downloadProviders($config, $globals)
 
             if (200 === $res->getStatusCode()) {
                 $oldcache = $cachedir . str_replace('%hash%.json', '*', $tpl);
-                if ($glob = glob($oldcache)) {
+                if ($glob = glob($oldcache)) {  // glob 返回一个包含有匹配文件／目录的数组。如果出错返回 FALSE。
                     foreach ($glob as $old) {
                         $globals->expiredManager->add($old, time());
                     }
                 }
-                if (!file_exists(dirname($cachename))) {
+                if (!file_exists(dirname($cachename))) {    // 目录不存在，则创建，leisi ：/data/packagist-crawler/cache/p
                     mkdir(dirname($cachename), 0777, true);
                 }
                 file_put_contents($cachename, $res->getBody());
@@ -197,7 +196,7 @@ function downloadPackages($config, $globals, $providers)
 
 
     if (0 === count($globals->mh)) return;
-    //残りの端数をダウンロード
+    //残りの端数をダウンロード 下载的尾数
     $globals->mh->waitResponse();
 
     $progressBar = new ProgressBarManager(0, count($globals->mh));
@@ -277,7 +276,7 @@ function checkFiles($config)
 
 function clearExpiredFiles(ExpiredFileManager $expiredManager)
 {
-    $expiredFiles = $expiredManager->getExpiredFileList();
+    $expiredFiles = $expiredManager->getExpiredFileList();  // 过期文件列表
 
     $progressBar = new ProgressBarManager(0, count($expiredFiles));
     $progressBar->setFormat("   - Clearing Expired Files: %current%/%max% [%bar%] %percent%%");
@@ -295,7 +294,7 @@ function clearExpiredFiles(ExpiredFileManager $expiredManager)
 function generateHtml($_config)
 {
     $url = $_config->url;
-    ob_start();
+    ob_start(); // 打开输出控制缓冲
     include __DIR__ . '/index.html.php';
     file_put_contents($_config->cachedir . '/index.html', ob_get_clean());
 }
