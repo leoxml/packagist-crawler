@@ -20,14 +20,14 @@ if (file_exists($config->lockfile)) {
 }
 
 touch($config->lockfile);   // 创建锁文件 尝试将由给出的文件的访问和修改时间设定为给出的时间，注意访问时间总是会被修改的，不论有几个参数。如果文件不存在，则会被创建。
-register_shutdown_function(function() use($config) {
+register_shutdown_function(function () use ($config) {
     unlink($config->lockfile);  // 代码执行完删除锁文件
 });
 
 $globals = new \stdClass;   // 可理解为新数组
 $globals->q = new \SplQueue;// stdClass属性，队列
 $globals->expiredManager = new ExpiredFileManager($config->expiredDb, $config->expireMinutes);
-for ($i=0; $i<$config->maxConnections; ++$i) {
+for ($i = 0; $i < $config->maxConnections; ++$i) {
     $req = new Request;
     $req->setOption('encoding', 'gzip');    // CURLOPT_ENCODING	HTTP请求头中"Accept-Encoding: "的值。 这使得能够解码响应的内容。 支持的编码有"identity"，"deflate"和"gzip"。如果为空字符串""，会发送所有支持的编码类型。	在 cURL 7.10 中被加入。
     $req->setOption('userAgent', 'https://github.com/hirak/packagist-crawler'); // CURLOPT_USERAGENT	在HTTP请求中包含一个"User-Agent: "头的字符串。
@@ -57,13 +57,13 @@ function downloadProviders($config, $globals)
 
     $packagesCache = $cachedir . 'packages.json';   // 缓存文件名
 
-    $req = new Request($config->packagistUrl . '/packages.json');   // 请求
+    $req = new Request($config->packagistUrl . '/packages.json');   // 实例化请求
     $req->setOption('encoding', 'gzip');    // CURLOPT_ENCODING	HTTP请求头中"Accept-Encoding: "的值。
 
     $res = $req->send();    // 发送请求
 
     if (200 === $res->getStatusCode()) {    // 请求成功
-        $packages = json_decode($res->getBody());
+        $packages = json_decode($res->getBody());   // json => Object
         foreach (explode(' ', 'notify notify-batch search') as $k) {
             if (0 === strpos($packages->$k, '/')) {
                 $packages->$k = 'https://packagist.org' . $packages->$k;
@@ -82,7 +82,7 @@ function downloadProviders($config, $globals)
 
     $providers = [];
 
-    $numberOfProviders = count( (array)$packages->{'provider-includes'} );  // key值里有短横线-，要这样写：{'provider-includes'}
+    $numberOfProviders = count((array)$packages->{'provider-includes'});  // key值里有短横线-，要这样写：{'provider-includes'}
     $progressBar = new ProgressBarManager(0, $numberOfProviders);
     $progressBar->setFormat('Downloading Providers: %current%/%max% [%bar%] %percent%%');
 
@@ -91,7 +91,7 @@ function downloadProviders($config, $globals)
         $cachename = $cachedir . $fileurl;
         $providers[] = $cachename;
 
-        if (!file_exists($cachename)){
+        if (!file_exists($cachename)) {
             $req->setOption('url', $config->packagistUrl . '/' . $fileurl);
             $res = $req->send();
 
@@ -102,11 +102,11 @@ function downloadProviders($config, $globals)
                         $globals->expiredManager->add($old, time());
                     }
                 }
-                if (!file_exists(dirname($cachename))) {    // 目录不存在，则创建，leisi ：/data/packagist-crawler/cache/p
+                if (!file_exists(dirname($cachename))) {    // 目录不存在，则创建，类似 ：/data/packagist-crawler/cache/p
                     mkdir(dirname($cachename), 0777, true);
                 }
                 file_put_contents($cachename, $res->getBody());
-                if ($config->generateGz) {
+                if ($config->generateGz) {  // 是否压缩
                     file_put_contents($cachename . '.gz', gzencode($res->getBody()));
                 }
             } else {
@@ -168,7 +168,7 @@ function downloadPackages($config, $globals, $providers)
                 $globals->q->enqueue($req);
 
                 if (200 !== $res->getStatusCode()) {
-                    error_log($res->getStatusCode(). "\t". $res->getUrl());
+                    error_log($res->getStatusCode() . "\t" . $res->getUrl());
                     $globals->retry = true;
                     continue;
                 }
@@ -251,12 +251,12 @@ function checkFiles($config)
 {
     $cachedir = $config->cachedir;
 
-    $packagejson = json_decode(file_get_contents($cachedir.'packages.json.new'));
+    $packagejson = json_decode(file_get_contents($cachedir . 'packages.json.new'));
 
     $i = $j = 0;
     foreach ($packagejson->{'provider-includes'} as $tpl => $provider) {
         $providerjson = str_replace('%hash%', $provider->sha256, $tpl);
-        $packages = json_decode(file_get_contents($cachedir.$providerjson));
+        $packages = json_decode(file_get_contents($cachedir . $providerjson));
 
         foreach ($packages->providers as $tpl2 => $sha) {
             if (!file_exists($file = $cachedir . "p/$tpl2\$$sha->sha256.json")) {
